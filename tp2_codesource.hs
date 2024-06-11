@@ -218,15 +218,16 @@ scons2l Snil [Ssym "node", se1, se2] = Lnode (s2l se1) (s2l se2)
 scons2l Snil (Ssym "node" : _sargs)
   = error "Nombre incorrect d'arguments passés à 'node'"
 scons2l Snil (Ssym "seq" : sargs) = foldr Lnode Lnull (map s2l sargs)
-scons2l Snil [Ssym "proc", sargs, sbody]
-  = let loop Snil body = body
-        loop (Scons sargs' sarg) body = loop sargs' (Lproc (s2v sarg) body)
-        loop se _ = error ("Arguments formels invalides: " ++ showSexp se)
-    in loop sargs (s2l sbody)
+scons2l Snil [Ssym "proc", sargs, sbody] = 
+  let loop Snil body = body
+      loop (Scons sarg Snil) body = Lproc (s2v sarg) [body]
+      loop (Scons sarg sargs') body = Lproc (s2v sarg) [loop sargs' body]
+      loop se _ = error ("Arguments formels invalides: " ++ showSexp se)
+  in loop sargs (s2l sbody)
 scons2l Snil (Ssym "proc" : _sargs)
   = error "Nombre incorrect d'arguments passés à 'proc'"
 scons2l Snil [Ssym "def", sdefs, sbody]
-  = Ldef (s2d sdefs) (s2l sbody)
+  = Ldef (s2d sdefs) [s2l sbody]
 scons2l Snil (Ssym "def" : _sargs)
   = error "Nombre incorrect d'arguments passés à 'def'"
 scons2l Snil (Ssym "case" : se : sbranches)
@@ -235,17 +236,17 @@ scons2l Snil (Ssym "case" : se : sbranches)
              Lcase e enull x1 x2 enode
                -> case sbranch of
                     Scons (Scons Snil (Ssym "null")) senull
-                      -> Lcase e (s2l senull) x1 x2 enode
+                      -> Lcase e [s2l senull] x1 x2 enode
                     Scons (Scons Snil
                                  (Scons (Scons (Scons Snil (Ssym "node")) sx1)
                                         sx2))
                           senode
-                      -> Lcase e enull (s2v sx1) (s2v sx2) (s2l senode)
+                      -> Lcase e enull (s2v sx1) (s2v sx2) [s2l senode]
                     _ -> error ("Branche invalide: " ++ showSexp sbranch)
              _ -> error "Erreur interne dans 'case'")
           (Lcase (s2l se)
-                 (Lvar "<branche-null-manquante>")
-                 "<dummy>" "<dummy>" (Lvar "<branche-node-manquante>"))
+                 [Lvar "<branche-null-manquante>"]
+                 "<dummy>" "<dummy>" [Lvar "<branche-node-manquante>"])
           sbranches
 scons2l Snil (se : sargs) = foldl Ldo (s2l se) (map s2l sargs)
 scons2l se _ = error ("Tête de liste impropre: " ++ showSexp se)
@@ -257,10 +258,10 @@ s2v se = error ("Pas un identifiant: " ++ (showSexp se))
 s2d :: Sexp -> [(Var, Lexp)]
 s2d Snil = []
 s2d (Scons sdefs (Scons (Scons Snil sd) se))
-  = let loop (Scons Snil svar) body = (s2v svar, body)
-        loop (Scons sd' svar) body = loop sd' (Lproc (s2v svar) body)
-        loop svar body = (s2v svar, body)
-    in loop sd (s2l se) : s2d sdefs
+  = let loop (Scons Snil svar) [body] = (s2v svar, body)
+        loop (Scons sd' svar) [body] = loop sd' [(Lproc (s2v svar) [body])]
+        loop svar [body] = (s2v svar, body)
+    in loop sd [s2l se] : s2d sdefs
 s2d se = error ("Definitions invalides: " ++ showSexp se)
 
 ---------------------------------------------------------------------------
