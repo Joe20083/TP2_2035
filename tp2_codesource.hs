@@ -325,20 +325,22 @@ eval env (Lnode e1 e2) = do v1 <- eval env e1
                             v2 <- eval env e2
                             return (Vcons v1 v2)
 -- ¡¡COMPLÉTER: la poursuivre conversion à IO dans le code ci-dessous!!
-eval env (Ldo e1 e2)
-  = case eval env e1 of
-     Vop f -> f (eval env e2)
-     Vclosure env' arg body -> eval ((arg, eval env e2) : env') body
-     v -> error ("Pas une fonction: " ++ show v)
-eval env (Lproc arg body) = Vclosure env arg body
-eval env (Ldef defs body)
-  = let nenv = map (\(x,e) -> (x, eval nenv e)) defs ++ env
-    in eval nenv body
-eval env (Lcase e enull x1 x2 enode)
-  = case eval env e of
-     Vnil -> eval env enull
-     Vcons v1 v2 -> eval ((x1, v1) : (x2, v2) : env) enode
-     v -> error ("Pas une liste: " ++ show v)
+eval env (Ldo e1 e2) = do v1 <- eval env e1
+                          case v1 of
+                            Vop f -> do v2 <- eval env e2
+                                        f v2
+                            Vclosure env' arg body -> do v2 <- eval env e2
+                                                         eval ((arg, v2) : env') (head body)
+                            _ -> error ("Pas une fonction: " ++ show v1)
+--eval env (Lproc arg body) = Vclosure env arg body
+--eval env (Ldef defs body)
+--  = let nenv = map (\(x,e) -> (x, eval nenv e)) defs ++ env
+--    in eval nenv body
+--eval env (Lcase e enull x1 x2 enode)
+--  = case eval env e of
+--     Vnil -> eval env enull
+--     Vcons v1 v2 -> eval ((x1, v1) : (x2, v2) : env) enode
+--     v -> error ("Pas une liste: " ++ show v)
 -- eval _ e = error ("Pas implanté: " ++ show e)
 
 ---------------------------------------------------------------------------
