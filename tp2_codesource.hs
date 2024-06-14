@@ -14,6 +14,7 @@
 import Text.ParserCombinators.Parsec -- Bibliothèque d'analyse syntaxique.
 import Data.Char                -- Conversion de Chars de/vers Int et autres.
 import System.IO                -- Pour stdout, hPutStr
+import System.IO.Unsafe (unsafePerformIO)
 
 ---------------------------------------------------------------------------
 -- 1ère représentation interne des expressions de notre langage           --
@@ -215,41 +216,34 @@ scons2l :: Sexp -> [Sexp] -> Lexp
 -- ¡¡COMPLÉTER: ajuster à la nouvelle syntaxe!!
 scons2l (Scons se1 se2) sargs = scons2l se1 (se2 : sargs)
 scons2l Snil [Ssym "node", se1, se2] = Lnode (s2l se1) (s2l se2)
-scons2l Snil (Ssym "node" : _sargs)
-  = error "Nombre incorrect d'arguments passés à 'node'"
+scons2l Snil (Ssym "node" : _sargs) = error "Nombre incorrect d'arguments passés à 'node'"
 scons2l Snil (Ssym "seq" : sargs) = foldr Lnode Lnull (map s2l sargs)
-scons2l Snil [Ssym "proc", sargs, sbody] = 
+scons2l Snil [Ssym "proc", sargs, sbody] =
   let loop Snil body = body
       loop (Scons sarg Snil) body = Lproc (s2v sarg) [body]
       loop (Scons sarg sargs') body = Lproc (s2v sarg) [loop sargs' body]
       loop se _ = error ("Arguments formels invalides: " ++ showSexp se)
   in loop sargs (s2l sbody)
-scons2l Snil (Ssym "proc" : _sargs)
-  = error "Nombre incorrect d'arguments passés à 'proc'"
-scons2l Snil [Ssym "def", sdefs, sbody]
-  = Ldef (s2d sdefs) [s2l sbody]
-scons2l Snil (Ssym "def" : _sargs)
-  = error "Nombre incorrect d'arguments passés à 'def'"
-scons2l Snil (Ssym "case" : se : sbranches)
-  = foldr (\ sbranch e' ->
+scons2l Snil (Ssym "proc" : _sargs) = error "Nombre incorrect d'arguments passés à 'proc'"
+scons2l Snil [Ssym "def", sdefs, sbody] = Ldef (s2d sdefs) [s2l sbody]
+scons2l Snil (Ssym "def" : _sargs) = error "Nombre incorrect d'arguments passés à 'def'"
+scons2l Snil (Ssym "case" : se : sbranches) =
+  foldr (\sbranch e' ->
            case e' of
-             Lcase e enull x1 x2 enode
-               -> case sbranch of
-                    Scons (Scons Snil (Ssym "null")) senull
-                      -> Lcase e [s2l senull] x1 x2 enode
-                    Scons (Scons Snil
-                                 (Scons (Scons (Scons Snil (Ssym "node")) sx1)
-                                        sx2))
-                          senode
-                      -> Lcase e enull (s2v sx1) (s2v sx2) [s2l senode]
-                    _ -> error ("Branche invalide: " ++ showSexp sbranch)
+             Lcase e enull x1 x2 enode ->
+               case sbranch of
+                
+                 Scons (Scons Snil (Ssym "null")) senull ->
+                   Lcase e [s2l senull] x1 x2 enode
+                 Scons (Scons Snil (Scons (Scons (Scons Snil (Ssym "node")) sx1) sx2)) senode ->
+                   Lcase e enull (s2v sx1) (s2v sx2) [s2l senode]
+                 _ -> error ("Branche invalide: " ++ showSexp sbranch)
              _ -> error "Erreur interne dans 'case'")
-          (Lcase (s2l se)
-                 [Lvar "<branche-null-manquante>"]
-                 "<dummy>" "<dummy>" [Lvar "<branche-node-manquante>"])
-          sbranches
+        (Lcase (s2l se) [Lvar "<branche-null-manquante>"] "<dummy>" "<dummy>" [Lvar "<branche-node-manquante>"])
+        sbranches
 scons2l Snil (se : sargs) = foldl Ldo (s2l se) (map s2l sargs)
 scons2l se _ = error ("Tête de liste impropre: " ++ showSexp se)
+
 
 s2v :: Sexp -> Var
 s2v (Ssym x) = x
@@ -320,18 +314,32 @@ elookup ((y,v):env) x = if x == y then v else elookup env x
 eval :: VEnv -> Lexp -> IO Value
 eval _ (Lnum n) = return (Vnum n)
 eval env (Lvar x) = return (elookup env x)
-eval _ Lnull = return (Vnil)
-eval env (Lnode e1 e2) = do v1 <- eval env e1
-                            v2 <- eval env e2
-                            return (Vcons v1 v2)
--- ¡¡COMPLÉTER: la poursuivre conversion à IO dans le code ci-dessous!!
-eval env (Ldo e1 e2) = do v1 <- eval env e1
-                          case v1 of
-                            Vop f -> do v2 <- eval env e2
-                                        f v2
-                            Vclosure env' arg body -> do v2 <- eval env e2
-                                                         eval ((arg, v2) : env') (head body)
-                            _ -> error ("Pas une fonction: " ++ show v1)
+eval _ Lnull = return Vnil
+eval env (Lnode e1 e2) = do
+  v1 <- eval env e1
+  v2 <- eval env e2
+  return (Vcons v1 v2)
+eval env (Ldo e1 e2) = do
+  v1 <- eval env e1
+  case v1 of
+    Vop f -> do
+      v2 <- eval env e2
+      f v2
+    Vclosure env' arg body -> do
+      v2 <- eval env e2
+      eval ((arg, v2) : env') (head body)
+    v -> error ("Pas une fonction: " ++ show v)
+eval env (Lproc arg body) = return $ Vclosure env arg body
+eval env (Ldef defs body) = do
+  let nenv = map (\(x,e) -> (x, unsafePerformIO (eval nenv e))) defs ++ env
+  eval nenv (head body)
+eval env (Lcase e enull x1 x2 enode) = do
+  v <- eval env e
+  case v of
+    Vnil -> eval env (head enull)
+    Vcons v1 v2 -> eval ((x1, v1) : (x2, v2) : env) (head enode)
+    v -> error ("Pas une liste: " ++ show v)
+
 --eval env (Lproc arg body) = Vclosure env arg body
 --eval env (Ldef defs body)
 --  = let nenv = map (\(x,e) -> (x, eval nenv e)) defs ++ env
