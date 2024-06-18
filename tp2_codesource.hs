@@ -218,15 +218,11 @@ scons2l (Scons se1 se2) sargs = scons2l se1 (se2 : sargs)
 scons2l Snil [Ssym "node", se1, se2] = Lnode (s2l se1) (s2l se2)
 scons2l Snil (Ssym "node" : _sargs) = error "Nombre incorrect d'arguments passés à 'node'"
 scons2l Snil (Ssym "seq" : sargs) = foldr Lnode Lnull (map s2l sargs)
-scons2l Snil [Ssym "proc", sargs, sbody] = 
-  let parseArgs :: Sexp -> [Var]
-      parseArgs Snil = []
-      parseArgs (Scons (Ssym arg) rest) = arg : parseArgs rest
-      parseArgs se = error ("Arguments formels invalides: " ++ showSexp se)
-      makeLproc :: [Var] -> Lexp -> Lexp
-      makeLproc [] body = body
-      makeLproc (arg:args) body = Lproc arg [makeLproc args body]
-  in makeLproc (parseArgs sargs) (s2l sbody)
+scons2l Snil [Ssym "proc", sargs, sbody] =
+  let loop Snil body = body
+      loop (Scons sargs' (Ssym sarg)) body = Lproc sarg [loop sargs' body]
+      loop se _ = error ("Arguments formels invalides: " ++ showSexp se)
+  in loop sargs (s2l sbody)
 scons2l Snil (Ssym "proc" : _sargs) = error "Nombre incorrect d'arguments passés à 'proc'"
 scons2l Snil [Ssym "def", sdefs, sbody] = Ldef (s2d sdefs) [s2l sbody]
 scons2l Snil (Ssym "def" : _sargs) = error "Nombre incorrect d'arguments passés à 'def'"
@@ -342,16 +338,6 @@ eval env (Lcase e enull x1 x2 enode) = do
     Vnil -> eval env (head enull)
     Vcons v1 v2 -> eval ((x1, v1) : (x2, v2) : env) (head enode)
     v -> error ("Pas une liste: " ++ show v)
-
---eval env (Lproc arg body) = Vclosure env arg body
---eval env (Ldef defs body)
---  = let nenv = map (\(x,e) -> (x, eval nenv e)) defs ++ env
---    in eval nenv body
---eval env (Lcase e enull x1 x2 enode)
---  = case eval env e of
---     Vnil -> eval env enull
---     Vcons v1 v2 -> eval ((x1, v1) : (x2, v2) : env) enode
---     v -> error ("Pas une liste: " ++ show v)
 -- eval _ e = error ("Pas implanté: " ++ show e)
 
 ---------------------------------------------------------------------------
@@ -367,6 +353,7 @@ evalprintlist (e : es) =
   do v <- evalSexp e
      hPutStr stdout (show v)
      hPutStr stdout ", "
+     evalprintlist es
 
 -- Lit un fichier contenant plusieurs Sexps, les évalues l'une après
 -- l'autre, et renvoie la liste des valeurs obtenues.
