@@ -19,3 +19,19 @@
 (/ (* (- 77 32) 2) 10)                                      ;   -> 9
 
 (def ((x 10) (y 15) (z 3)) (/ (* x y) z))                   ;   -> 50
+
+(seq 2 3 4)                                                 ;   -> [2 3 4]
+
+(def ((square (proc (x) (* x x))))(square 5))               ;   -> 25
+
+(def   
+    ((sum (proc (lst)
+            (case lst
+                (null 0)
+                ((node x xs) (+ x (sum xs)))
+                )
+            )
+    )
+)
+ (sum (node 1 (node 2 (node 3 (node 4 (node 5 null))))))
+)                                                           ;   -> 15
