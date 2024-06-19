@@ -1,0 +1,30 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+\title{Rapport Lips Tp 2}
+\author{Maxime Desjardins 20131853, Joseph Finan 20255174}
+\date{18 Juin 2024}
+
+\begin{document}
+
+\maketitle
+
+\paragraph{La première étape de l'adaptation du code source a été de corriger les erreurs de typage dans la fonction s2l et la fonction Scons2l. La modification a été faite de manière un peu approximative en remplaçant des section de parenthèses par des listes ou en insérant des arguments dans des listes. Le bût était de corriger les erreurs de compilation une par une jusqu'à ce qu'il n'y en ai plus.}
+
+\paragraph{Par la suite il a été décidé de mettre l'entièreté de la fonction eval en commentaire pour que la compilation fonctionne et ainsi commencer à faire les test de la fonction s2l et Scons2l. Les tests pour la conversion des fonctions binaire simples étant fonctionnel, la fonction eval gérant ce type d'opération a été retiré des commentaires et adaptée pour faire correctement l'évaluation.}
+
+\paragraph{Par la suite, il est venu le temps de faire la fonction eval pour les opérations contenant "proc". Comme l'évaluation ne fonctionnait pas, elle a été mise à nouveau en commentaire pour effectuer les tests de conversion s2l et Scons2l. Il s'est avéré être plus difficile que prévu de faire correctement la conversion des opérations contenant "proc" et après plusieurs tentative, aucune solutions viable n'a été trouvé.}
+
+\paragraph{Après avoir fait une modification de Scons2l approximative l'évaluation des équations du type "proc" se sont mise subitement à fonctionner correctement sans trop comprendre pourquoi. En testant un exemple d'équation utilisant "def" il s'est avéré que cette fonction fonctionne parfaitement aussi. Nous soupconnons qu'il s'agissait d'un problème de scope qui a été résolu par des parenthèses bien ajustées.}
+
+\paragraph{L'un des principaux défis était de bien comprendre et parser correctement les structures imbriquées complexes, en particulier les procédures (proc) 
+et les case. Nous avons implémenté une fonction de parsing dédiée pour proc qui traite récursivement la liste des arguments et construit les expressions Lproc imbriquées. On était bloqué pendant longtemps sur cette section du travail, car nos changements au gabarit de code lancait des erreurs d'arguments invalides qu'on n'arrivait pas à résoudre. On a enfin compris qu'il fallait forcer dans la section : scons2l Snil [Ssym "proc", sargs, sbody] , à fournir sargs à Ssym et l'interprétation en sexp et lexp a fonctionné.  }
+
+\paragraph{Ensuite, il fallait s'assurer que les procédures récursives étaient correctement évaluées, en particulier lors de la gestion des defs mutuellement récursifs. Après plusieurs essais infructueux de redéfinir : eval env (Ldef defs body) , nous avons utilisé la fonction de Haskell "unsafePerformIO" pour pouvoir créer un environnement récursif où chaque variable peut être correctement évaluée même si elle dépend d'autres variables définies dans le même scope. Ce qui a aussi posé difficulté est l'évaluation correcte des procédures sans introduire d'effets de bords. }
+
+\paragraph{Nous avons aussi introduit dans la construction des des cas de gestions d'erreurs pour l'analyseur lexical, l'analyseur syntaxique et l'évaluateur. Par exemple, on lance un message d'erreur si il n'y a pas assez d'arguments ou que c'est du mauvais type, concernant les contructeurs de scons2l.}
+
+\paragraph{Nos tests choisis pour ce travail pratique couvrent un large éventail de scénarios  comme les opérations arithmétiques, les définitions de procédures, les appels de fonctions récursives ainsi que les case . L'interpréteur de style Lisp se comporte au final comme prévu, avec les tests choisis.}
+
+\paragraph{En conclusion, ce projet nous a fourni des connaissances précieuses sur les complexités de la conception de languages informatiques, et les défis que nous avons résolus nous ont permis d'améliorer nos compétences en Haskell et en général en language de bas-niveau. Nous avons vraiment réalisés à quel point même des détails sont très complexes, du point de vue de la machine. Les erreurs de typage qu'on avait à regler ont été très complexes à comprendre, et a nécessité beaucoup d'essais-erreur. L'interpréteur final constitue une bonne base pour des futures extensions et améliorations du langage de style Lisp. }
+\end{document}
